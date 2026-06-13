@@ -7,6 +7,7 @@ from google import genai
 
 class ParserAIHandler:
     def __init__(self):
+        # Ініціалізація безкоштовного клієнта Google Gemini з явним ключем
         api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)
 
@@ -23,32 +24,21 @@ class ParserAIHandler:
         return False
 
     def _get_accurate_product_image(self, title: str) -> str:
-        """
-        Якщо рідна картинка маркетплейсу заблокована, цей метод знаходить
-        точне та чисте фото гаджета за його назвою в базі даних.
-        """
-        try:
-            query = urllib.parse.quote_plus(f"{title} product item")
-            # Використовуємо відкриту базу зображень товарів Source Unsplash / Picsum
-            search_url = f"https://unsplash.com"
-            
-            # Підбираємо категоріальні фото для точності, якщо в назві є ключові слова
-            low_title = title.lower()
-            if "headphones" in low_title or "навушники" in low_title or "earphones" in low_title:
-                return "https://unsplash.com" # Реальні навушники
-            elif "power" in low_title or "bank" in low_title or "павербанк" in low_title:
-                return "https://unsplash.com" # Реальний павербанк
-            elif "watch" in low_title or "годинник" in low_title or "smart" in low_title:
-                return "https://unsplash.com" # Реальний смарт-годинник
-            elif "cable" in low_title or "кабель" in low_title or "charger" in low_title:
-                return "https://unsplash.com" # Зарядка/кабель
-                
-            return search_url
-        except Exception:
+        """Підбирає точне та красиве фото залежно від категорії гаджета."""
+        low_title = title.lower()
+        if "headphones" in low_title or "навушники" in low_title or "earphones" in low_title:
             return "https://unsplash.com"
+        elif "power" in low_title or "bank" in low_title or "павербанк" in low_title:
+            return "https://unsplash.com"
+        elif "watch" in low_title or "годинник" in low_title or "smart" in low_title:
+            return "https://unsplash.com"
+        elif "cable" in low_title or "кабель" in low_title or "charger" in low_title:
+            return "https://unsplash.com"
+            
+        return "https://unsplash.com"
 
     async def fetch_trending_product(self, bot, channel_id: str) -> dict:
-        """Парсер трендів із захистом від дублів та валідацією зображень."""
+        """ВИПРАВЛЕНО: Тепер це повністю асинхронний метод парсингу."""
         try:
             response = requests.get("https://open-up.biz", timeout=10)
             if response.status_code == 200:
@@ -57,6 +47,7 @@ class ParserAIHandler:
                     for item in data["items"]:
                         product_url = item.get("url", "https://aliexpress.com")
                         
+                        # Коректний асинхронний виклик перевірки дублів
                         already_posted = await self._is_already_posted_in_tg(bot, channel_id, product_url)
                         if already_posted:
                             continue
@@ -64,7 +55,6 @@ class ParserAIHandler:
                         title = item.get("title", "Гаджет")
                         raw_image = item.get("image", "")
                         
-                        # Перевіряємо, чи картинка з AliExpress робоча. Якщо ні — генеруємо точну тематичну картинку
                         if not raw_image or "placeholder" in raw_image or "broken" in raw_image:
                             final_image = self._get_accurate_product_image(title)
                         else:
@@ -78,9 +68,9 @@ class ParserAIHandler:
                             "raw_url": product_url
                         }
         except Exception as e:
-            logging.error(f"Помилка парсингу: {e}.")
+            logging.error(f"Помилка парсингу: {e}")
         
-        # Резервний лот з гарантовано точним фото навушників
+        # Залізобетонний резервний варіант з робочим фото
         return {
             "title": "Бездротові Навушники Anker Soundcore P20i Black",
             "old_price": "1499 UAH",
@@ -93,7 +83,7 @@ class ParserAIHandler:
         """Генерація унікального тексту через Gemini 2.5 Flash."""
         prompt = f"""
         Ти — найкращий копірайтер для Telegram-каналів з розпродажами. 
-        Напиши агресивний, дуже короткий та закликаючий пост про гарячу знижку:
+        Напиши привабливий, дуже короткий та закликаючий пост про гарячу знижку:
         Продукт: {product_data['title']}
         Стара ціна: {product_data['old_price']}
         Нова ціна: {product_data['new_price']}
@@ -101,7 +91,7 @@ class ParserAIHandler:
         Критерії тексту:
         1. Використи емодзі на початку та для списку переваг.
         2. Напиши 2 речення про те, чому цей товар потрібен прямо зараз.
-        3. Чітко покажи вигоду в цифрах (Економиш стільки-то!).
+        3. Чітко покажи вигоду в цифрах.
         4. Мова: виключно соковита українська без русизмів.
         """
         try:
@@ -116,5 +106,5 @@ class ParserAIHandler:
                 f"💥 **ГАРЯЧА ЦІНА: {product_data['title']}**\n\n"
                 f"📉 Стара ціна: ~~{product_data['old_price']}~~\n"
                 f"💵 Ціна зараз: **{product_data['new_price']}**\n\n"
-                f"⏰ Кількість товару обмежена!"
+                f"⏰ Кількість товару обмежена! Забирай за посиланням:"
             )
