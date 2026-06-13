@@ -16,23 +16,24 @@ pay_manager = PayManager()
 marketing_hub = MarketingHub()
 
 async def dynamic_orchestrator_job():
-    """ГОЛОВНИЙ ОРКЕСТРАТОР: Публікує тільки унікальний контент."""
+    """ГОЛОВНИЙ ОРКЕСТРАТОР: Публікує тільки унікальний контент з коректною асинхронністю."""
     channel_id = os.getenv("CHANNEL_ID")
     subs_count = await marketing_hub.check_channel_subscribers(bot)
     
     logging.info("⚙️ Контент: Початок пошуку унікального товару...")
     
-    # Метод fetch_trending_product тепер САМ гарантує повернення НОВОГО товару
-    product = ai_handler.fetch_trending_product()
-    ai_text = ai_handler.generate_ai_post(product)
-    affiliate_url = pay_manager.generate_affiliate_link(product["raw_url"])
-    
-    full_caption = f"{ai_text}\n\n🔗 [КУПИТИ ЗІ ЗНИЖКОЮ]({affiliate_url})"
     try:
+        # ВИПРАВЛЕНО: Додано обов'язкове слово await для асинхронного запиту
+        product = await ai_handler.fetch_trending_product(bot, channel_id)
+        ai_text = ai_handler.generate_ai_post(product)
+        affiliate_url = pay_manager.generate_affiliate_link(product["raw_url"])
+        
+        full_caption = f"{ai_text}\n\n🔗 [КУПИТИ ЗІ ЗНИЖКОЮ]({affiliate_url})"
+        
         await bot.send_photo(chat_id=channel_id, photo=product["image_url"], caption=full_caption, parse_mode="Markdown")
-        logging.info("✅ Унікальний товар опубліковано в канал успішно.")
+        logging.info("✅ Унікальний товар успішно надіслано в Telegram-канал.")
     except Exception as e:
-        logging.error(f"Помилка публікації товару: {e}")
+        logging.error(f"Помилка під час виконання циклу публікації: {e}")
 
     # Блок маркетингу для старту
     if subs_count < 500:
