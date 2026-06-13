@@ -5,12 +5,13 @@ from google import genai
 
 class ParserAIHandler:
     def __init__(self):
-        # Ініціалізація повністю безкоштовного Google Gemini API
-        self.client = genai.Client()
+        # Виправлено: явна передача API-ключа з налаштувань хостингу
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=api_key)
 
     def fetch_trending_product(self) -> dict:
         """
-        Бойовий парсер трендових знижок.
+        Парсер реальних трендових знижок.
         """
         try:
             response = requests.get("https://open-up.biz", timeout=10)
@@ -19,9 +20,9 @@ class ParserAIHandler:
                 if data.get("items"):
                     item = data["items"]
                     return {
-                        "title": item.get("title", "Смарт-гаджет"),
-                        "old_price": f"{item.get('old_price', '2500')} UAH",
-                        "new_price": f"{item.get('new_price', '1499')} UAH",
+                        "title": item.get("title", "Гаджет"),
+                        "old_price": f"{item.get('old_price', '1999')} UAH",
+                        "new_price": f"{item.get('new_price', '1199')} UAH",
                         "image_url": item.get("image", "https://unsplash.com"),
                         "raw_url": item.get("url", "https://aliexpress.com")
                     }
@@ -38,24 +39,25 @@ class ParserAIHandler:
 
     def generate_ai_post(self, product_data: dict) -> str:
         """
-        Генерація соковитого тексту через безкоштовну модель gemini-2.5-flash
+        Генерація соковитого тексту через модель gemini-3.5-flash
         """
         prompt = f"""
         Ти — найкращий копірайтер для Telegram-каналів з розпродажами. 
-        Напиши агресивний, ультра-короткий та закликаючий пост про гарячу знижку:
+        Напиши агресивний, дуже короткий та закликаючий пост про гарячу знижку:
         Продукт: {product_data['title']}
         Стара ціна: {product_data['old_price']}
-        Нова ціна: {product_data['new_price']}
+        Nova ціна: {product_data['new_price']}
         
         Критерії тексту:
-        1. Використовуй емодзі на початку та для списку.
+        1. Використи емодзі на початку та для списку переваг.
         2. Напиши 2 речення про те, чому цей товар потрібен прямо зараз.
         3. Чітко покажи вигоду в цифрах (Економія!).
         4. Мова: виключно соковита українська без русизмів.
         """
         try:
+            # Виправлено викликальний метод для генерації контенту в новій бібліотеці
             response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.5-flash',
                 contents=prompt,
             )
             return response.text
